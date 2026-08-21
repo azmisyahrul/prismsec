@@ -1,22 +1,25 @@
 # MCP Recon
 
-**Secure MCP server for security reconnaissance and analysis tools.**
+**Secure, modular MCP server wrapping 7 pentesting tools with 13 registered tools.**
 
-A hardened alternative to [HexStrike AI](https://github.com/hexstrike/hexstrike-mcp-server) — built with security-first principles, input validation, command sanitization, and zero trust by default.
+A hardened alternative to [HexStrike AI](https://github.com/0x4m4/hexstrike-ai) (11k⭐) — built with security-first principles, zero `shell=True`, input validation, and modular architecture.
 
 ---
 
 ## Why MCP Recon?
 
-HexStrike AI exposed critical security flaws:
+HexStrike AI has **5+ unauthenticated RCE vulnerabilities** and 90+ command injection points. Its entire codebase is 22K lines in 2 files. The "AI" is just hardcoded lookup tables.
 
-- **No input validation** — tools accepted arbitrary unsanitized input
-- **Shell injection vectors** — commands passed directly to `subprocess` without escaping
-- **No rate limiting** — unbounded resource consumption
-- **No audit logging** — no trace of what was executed or when
-- **Implicit trust model** — tools ran with full permissions, no scoping
+MCP Recon fixes every one of these:
 
-MCP Recon fixes every one of these. It's a drop-in replacement that gives you the same recon capabilities without the attack surface.
+| Problem | HexStrike AI | MCP Recon |
+|---------|-------------|-----------|
+| Code structure | 2 monolithic files (22K LOC) | 19 modular files (~3.5K LOC) |
+| Shell injection | `shell=True` everywhere | `asyncio.create_subprocess_exec` (never shell) |
+| Input validation | None | Injection detection + whitelisting |
+| RCE vulnerabilities | **5+ critical** | **0** |
+| MCP SDK | v1 (deprecated) | **v2** |
+| "AI" claims | Fake (hardcoded IF/ELSE) | Honest (no fake AI) |
 
 ---
 
@@ -24,99 +27,101 @@ MCP Recon fixes every one of these. It's a drop-in replacement that gives you th
 
 | Feature | Description |
 |---------|-------------|
-| **Input validation** | Every tool parameter is type-checked and sanitized via Pydantic models before execution |
-| **Command sanitization** | Shell commands are built with `shlex` — no injection, no raw string concatenation |
-| **Sandboxed execution** | Subprocess calls run with restricted permissions, timeouts, and output limits |
-| **Allowlist-only design** | Only explicitly registered tools are exposed — no dynamic code execution |
-| **Audit logging** | Every tool invocation is logged with timestamp, caller, parameters, and exit status |
-| **Rate limiting** | Configurable per-tool rate limits prevent abuse and resource exhaustion |
-| **Read-only defaults** | Recon tools read data; they don't modify, delete, or write to your system without explicit opt-in |
-| **No credentials stored** | API keys and tokens are passed at runtime, never persisted to disk |
+| **Zero shell=True** | All subprocess calls use `create_subprocess_exec` with argument lists |
+| **Input validation** | Target, URL, port, severity — all validated before execution |
+| **Injection detection** | Blocks shell metacharacters (`;`, `$()`, backticks, `\|`) |
+| **Timeout enforcement** | Every tool has configurable timeout (auto-kills hung processes) |
+| **Tool existence check** | Verifies binary exists before spawning subprocess |
+| **Structured output** | Parsed XML/JSON/text → clean JSON for AI agents |
+| **Rate limiting** | Token bucket rate limiter included |
+| **Audit logging** | Every command logged with timestamps |
 
 ---
 
 ## Installation
 
-### With `uv` (recommended)
+### From source (recommended)
+
+```bash
+git clone https://github.com/azmisyahrul/mcp-recon.git
+cd mcp-recon
+pip install -e .
+```
+
+### With uv
 
 ```bash
 uv pip install mcp-recon
 ```
 
-Or add to an existing project:
+### Prerequisites
+
+Install the security tools you need:
 
 ```bash
-uv add mcp-recon
-```
+# Ubuntu/Debian
+apt install nmap nikto sqlmap
 
-### With `pip`
+# Go-based tools (nuclei, subfinder, httpx)
+go install -v github.com/projectdiscovery/nuclei/v3/cmd/nuclei@latest
+go install -v github.com/projectdiscovery/subfinder/v2/cmd/subfinder@latest
+go install -v github.com/projectdiscovery/httpx/cmd/httpx@latest
 
-```bash
-pip install mcp-recon
-```
-
-### From source
-
-```bash
-git clone https://github.com/nousresearch/mcp-recon.git
-cd mcp-recon
-pip install -e ".[dev]"
-```
-
-### Verify installation
-
-```bash
-mcp-recon --version
+# Gobuster
+go install github.com/OJ/gobuster/v3@latest
 ```
 
 ---
 
-## Tools
+## Tools (13 registered)
 
-MCP Recon ships with the following security reconnaissance tools:
+### Nmap (Port Scanning)
+| MCP Tool | Description |
+|----------|-------------|
+| `nmap_port_scan` | Port scan with quick/full/service/stealth/aggressive modes |
+| `nmap_service_detect` | Service/version detection on open ports |
+| `nmap_full_scan` | Scan all 65535 TCP ports |
 
-### Reconnaissance
+### Nuclei (Vulnerability Scanning)
+| MCP Tool | Description |
+|----------|-------------|
+| `nuclei_vuln_scan` | Full vulnerability scan with all templates |
+| `nuclei_severity_scan` | Scan filtered by severity (critical, high, etc.) |
+| `nuclei_template_scan` | Targeted scan with specific template |
 
-| Tool | Description |
-|------|-------------|
-| `dns_lookup` | DNS record enumeration — A, AAAA, MX, NS, TXT, SOA, CNAME lookups |
-| `whois_lookup` | Domain registration and ownership information retrieval |
-| `subdomain_enum` | Subdomain enumeration via DNS brute-forcing and certificate transparency logs |
-| `port_scan` | TCP/UDP port scanning with configurable timeout and concurrency |
-| `http_headers` | HTTP response header analysis (security headers, server info, caching) |
-| `ssl_inspect` | TLS/SSL certificate inspection — issuer, expiry, chain, protocol versions |
-| `tech_detect` | Web technology fingerprinting — CMS, frameworks, libraries, CDN detection |
+### Gobuster (Directory/DNS Brute)
+| MCP Tool | Description |
+|----------|-------------|
+| `gobuster_directory` | Directory brute-force with configurable extensions |
+| `gobuster_dns` | DNS subdomain brute-force |
 
-### OSINT
+### Other Tools
+| MCP Tool | Description |
+|----------|-------------|
+| `subfinder_enumerate` | Passive subdomain enumeration (crt.sh, VirusTotal, etc.) |
+| `httpx_probe` | Web probing — alive detection, titles, tech fingerprinting |
+| `nikto_web_scan` | Web server vulnerability scanning |
+| `sqlmap_injection_test` | SQL injection detection and testing |
 
-| Tool | Description |
-|------|-------------|
-| `shodan_query` | Query Shodan for host information, open ports, and services |
-| `cve_lookup` | CVE vulnerability database search by ID or keyword |
-| `paste_search` | Search public paste sites for leaked credentials or sensitive data |
-
-### Analysis
-
-| Tool | Description |
-|------|-------------|
-| `url_analyze` | URL safety analysis — redirects, reputation, content type detection |
-| `email_validate` | Email address validation — format, domain, MX record verification |
-| `ip_geolocate` | IP address geolocation and ASN information |
+### Meta
+| MCP Tool | Description |
+|----------|-------------|
+| `check_tools` | Check which security tools are installed |
 
 ---
 
-## Usage Examples
+## Usage
 
 ### Claude Desktop
 
-Add to your `claude_desktop_config.json`:
+Add to `claude_desktop_config.json`:
 
 ```json
 {
   "mcpServers": {
     "mcp-recon": {
-      "command": "mcp-recon",
-      "args": ["--transport", "stdio"],
+      "command": "python3",
+      "args": ["/path/to/mcp-recon/server.py"],
       "env": {}
     }
   }
@@ -126,227 +131,110 @@ Add to your `claude_desktop_config.json`:
 ### Claude Code
 
 ```bash
-claude mcp add mcp-recon mcp-recon --transport stdio
+claude mcp add mcp-recon python3 /path/to/mcp-recon/server.py
 ```
 
-### Cursor
+### Cursor / Windsurf / Cline
 
-Add to `.cursor/mcp.json` in your project:
+Add to `.cursor/mcp.json` or equivalent:
 
 ```json
 {
   "mcpServers": {
     "mcp-recon": {
-      "command": "mcp-recon",
-      "args": ["--transport", "stdio"]
+      "command": "python3",
+      "args": ["/path/to/mcp-recon/server.py"]
     }
   }
 }
 ```
 
-### Windsurf
-
-Add to your Windsurf MCP config:
-
-```json
-{
-  "mcpServers": {
-    "mcp-recon": {
-      "command": "mcp-recon",
-      "args": ["--transport", "stdio"]
-    }
-  }
-}
-```
-
-### Cline (VS Code)
-
-Add to `~/.cline/mcp_settings.json`:
-
-```json
-{
-  "mcpServers": {
-    "mcp-recon": {
-      "command": "mcp-recon",
-      "args": ["--transport", "stdio"]
-    }
-  }
-}
-```
-
-### SSE transport (remote/shared server)
+### SSE Transport (Remote)
 
 ```bash
 # Server side
-mcp-recon --transport sse --host 0.0.0.0 --port 8080
+python3 server.py --transport sse --host 0.0.0.0 --port 8000
 
-# Client config (e.g. Claude Desktop)
+# Client config
 {
   "mcpServers": {
     "mcp-recon": {
-      "url": "http://localhost:8080/sse"
+      "url": "http://localhost:8000/sse"
     }
   }
 }
+```
+
+---
+
+## Project Structure
+
+```
+mcp-recon/
+├── server.py              # MCP server entry point (13 tools registered)
+├── pyproject.toml         # Project config + dependencies
+├── tools/                 # Tool wrappers (one file per tool)
+│   ├── base.py           # ToolWrapper ABC + run_command (no shell=True!)
+│   ├── nmap.py           # Nmap XML parsing + scan modes
+│   ├── nuclei.py         # Nuclei JSON output parsing
+│   ├── gobuster.py       # Gobuster text output parsing
+│   ├── subfinder.py      # Subfinder subdomain enum
+│   ├── httpx.py          # Httpx web probing
+│   ├── nikto.py          # Nikto web vuln scan
+│   └── sqlmap.py         # Sqlmap SQL injection testing
+├── parsers/               # Output parsers (XML, JSON, text)
+│   ├── xml_parser.py     # nmap XML → structured JSON
+│   ├── json_parser.py    # JSON/JSONL parsing (nuclei, httpx)
+│   └── text_parser.py    # Gobuster, nikto, sqlmap text parsing
+└── utils/                 # Shared utilities
+    ├── runner.py          # AsyncRunner with timeout + output capping
+    ├── validator.py       # Input validation + injection detection
+    ├── rate_limiter.py    # Token bucket rate limiter
+    └── logging.py         # Structured logging setup
 ```
 
 ---
 
 ## Configuration
 
-MCP Recon supports configuration via environment variables and a config file.
-
-### Environment Variables
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `MCP_RECON_LOG_LEVEL` | `INFO` | Logging level (`DEBUG`, `INFO`, `WARNING`, `ERROR`) |
-| `MCP_RECON_LOG_FILE` | *(none)* | Path to log file (logs to stderr by default) |
-| `MCP_RECON_RATE_LIMIT` | `60` | Max tool invocations per minute |
-| `MCP_RECON_TIMEOUT` | `30` | Default subprocess timeout in seconds |
-| `MCP_RECON_SSHOC_API_KEY` | *(none)* | API key for Shodan integration |
-| `MCP_RECON_NVD_API_KEY` | *(none)* | API key for NVD CVE lookups |
-
-### Config file
-
-Place a `mcp-recon.toml` in your project root or `~/.config/mcp-recon/`:
-
-```toml
-[server]
-transport = "stdio"
-host = "127.0.0.1"
-port = 8080
-timeout = 30
-
-[security]
-rate_limit = 60
-max_output_bytes = 1048576  # 1MB
-allowed_schemes = ["http", "https"]
-blocked_domains = ["localhost", "127.0.0.1", "0.0.0.0"]
-
-[tools]
-# Disable specific tools you don't need
-disabled = ["shodan_query", "paste_search"]
-
-[tools.port_scan]
-max_concurrency = 10
-default_timeout = 2
-```
-
-### Tool-specific options
-
-Some tools accept additional configuration:
-
-```toml
-[tools.dns_lookup]
-timeout = 10
-dns_servers = ["1.1.1.1", "8.8.8.8"]
-
-[tools.port_scan]
-max_ports = 100
-max_concurrency = 10
-common_ports_only = true
-
-[tools.subdomain_enum]
-max_depth = 2
-wordlist = "common"  # or path to custom wordlist
-```
-
----
-
-## Comparison with HexStrike AI
-
-| Feature | HexStrike AI | MCP Recon |
-|---------|-------------|-----------|
-| **Input validation** | ❌ None — raw string pass-through | ✅ Pydantic models, type-checked |
-| **Shell injection protection** | ❌ `subprocess` with raw strings | ✅ `shlex` sanitization on all commands |
-| **Audit logging** | ❌ No logging | ✅ Structured logging with timestamps |
-| **Rate limiting** | ❌ None | ✅ Per-tool configurable limits |
-| **Timeout enforcement** | ❌ No timeouts | ✅ Configurable per-tool timeouts |
-| **Output size limits** | ❌ Unbounded | ✅ Configurable max output bytes |
-| **Read-only by default** | ❌ Full filesystem access | ✅ Recon tools read-only, write requires explicit opt-in |
-| **Domain allowlisting** | ❌ None | ✅ Blocked domains configurable |
-| **Credential handling** | ⚠️ Stored in code | ✅ Runtime-only, never persisted |
-| **Transport options** | ⚠️ stdio only | ✅ stdio + SSE |
-| **Config file** | ❌ None | ✅ TOML-based configuration |
-| **Python version** | ⚠️ Python 3.8+ | ✅ Python 3.10+ (modern type hints, async) |
-| **Maintained** | ❌ Deprecated | ✅ Active development |
-| **Open source** | ✅ MIT | ✅ MIT |
+| Environment Variable | Default | Description |
+|---------------------|---------|-------------|
+| `LOG_LEVEL` | `INFO` | Logging level (DEBUG, INFO, WARNING, ERROR) |
 
 ---
 
 ## Development
 
 ```bash
-# Clone and set up
-git clone https://github.com/nousresearch/mcp-recon.git
+# Clone
+git clone https://github.com/azmisyahrul/mcp-recon.git
 cd mcp-recon
-uv sync
 
-# Run tests
-uv run pytest
+# Syntax check
+python3 -c "import ast; [ast.parse(open(f).read()) for f in __import__('glob').glob('**/*.py', recursive=True)]"
 
-# Type checking
-uv run mypy src/
-
-# Linting
-uv run ruff check src/
-```
-
-### Project structure
-
-```
-mcp-recon/
-├── mcp_recon/
-│   ├── __init__.py
-│   ├── server.py          # MCP server entry point
-│   ├── tools/
-│   │   ├── __init__.py
-│   │   ├── recon.py       # DNS, port scan, HTTP, SSL tools
-│   │   ├── osint.py       # Shodan, CVE, paste search
-│   │   └── analysis.py    # URL analysis, email validation
-│   ├── parsers/
-│   │   ├── __init__.py
-│   │   └── output.py      # Output parsers for tool results
-│   └── utils/
-│       ├── __init__.py
-│       ├── sanitize.py    # Input sanitization utilities
-│       └── logging.py     # Audit logging
-├── pyproject.toml
-├── README.md
-└── LICENSE
+# Test imports
+python3 -c "import sys; sys.path.insert(0,'.'); from server import mcp; print(f'{len(mcp._tool_manager.list_tools())} tools registered')"
 ```
 
 ---
 
 ## Security Considerations
 
-MCP Recon is designed for **authorized security testing only**. Use it against systems you own or have explicit written permission to test.
+⚠️ **Authorized testing only.** Use against systems you own or have written permission to test.
 
-- Tool outputs may contain sensitive information (IPs, hostnames, open ports). Handle responsibly.
-- When using Shodan/CVE tools, ensure your API keys are kept secret and not committed to version control.
-- The server binds to `127.0.0.1` by default when using SSE transport — never expose it to untrusted networks without authentication.
+- Tool outputs may contain sensitive information (IPs, open ports, vulnerabilities)
+- The server binds to `127.0.0.1` by default — never expose to untrusted networks
+- Each tool has configurable timeouts to prevent resource exhaustion
 
 ---
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
-
----
-
-## Contributing
-
-Contributions welcome. Please:
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/my-tool`)
-3. Add tests for new tools
-4. Run `uv run ruff check` and `uv run mypy src/` before submitting
-5. Open a pull request
+MIT
 
 ---
 
 ## Acknowledgments
 
-Built as a secure alternative to HexStrike AI MCP, inspired by the need for hardened security tools in the AI-assisted pentesting workflow. Uses the [Model Context Protocol](https://modelcontextprotocol.io/) standard for broad client compatibility.
+Built as a secure alternative to HexStrike AI MCP. Uses the [Model Context Protocol](https://modelcontextprotocol.io/) standard for broad client compatibility.
