@@ -49,7 +49,7 @@ from utils.logging import setup_logging
 
 logger = setup_logging(level=os.environ.get("LOG_LEVEL", "INFO"))
 mcp = FastMCP(
-    "MCP Recon Security Tools",
+    "PrismSec Security Tools",
     instructions="Modular security tools server for reconnaissance, vulnerability "
                 "scanning, and penetration testing.",
 )

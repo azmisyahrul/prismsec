@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "mcp-recon"
+name = "prismsec"
 version = "0.1.0"
 description = "MCP security/pentesting tools server — async subprocess execution with structured JSON output"
 readme = "README.md"
